@@ -8,6 +8,8 @@
 #include <locale>
 #include <clocale>
 
+#include "./../lib/library.h"
+
 std::mutex m;
 std::condition_variable cv;
 std::queue<std::string> buffer;
