@@ -5,6 +5,8 @@
 #include <string>
 #include <queue>
 #include <algorithm>
+#include <locale>
+#include <clocale>
 
 std::mutex m;
 std::condition_variable cv;
@@ -12,8 +14,8 @@ std::queue<std::string> buffer;
 bool exit_flag = false;
 
 extern "C" {
-    void function1(char* str);
-    int function2(const char* str);
+    void function1(char* str) { return;  };
+    int function2(const char* str) { return 0; };
 }
 
 void receiver() {
@@ -26,22 +28,22 @@ void receiver() {
             cv.notify_one();
             break;
         }
-        
+
         // check for length constraint 
-        if (input.length() > 64) { 
-            std::cerr << "Error: Max length is 64 symbols\n";   
-            continue; 
+        if (input.length() > 64) {
+            std::cerr << "Error: Max length is 64 symbols\n";
+            continue;
         }
         //check for only numbers constraint
-        bool valid = std::all_of(input.begin(), input.end(), [](char c){ return std::isdigit(c); });
+        bool valid = std::all_of(input.begin(), input.end(), [](char c) { return std::isdigit(c); });
 
         if (!valid) {
             std::cerr << "Error: Only digits allowed\n";
             continue;
         }
         // Give input to function 1 of library
-        char* cstr = new char[input.size() +1];
-        std::strcpy(cstr, input.c_str());
+        char* cstr = new char[input.size() + 1];
+        strcpy_s(cstr, input.size()+1, input.c_str());
         function1(cstr);
         std::string processed_input(cstr);
         delete[] cstr;
@@ -55,9 +57,9 @@ void receiver() {
 }
 
 void sender() {
-    while(true) {
+    while (true) {
         std::unique_lock<std::mutex> lock(m);
-        cv.wait(lock, []{ return !buffer.empty() || exit_flag; });
+        cv.wait(lock, [] { return !buffer.empty() || exit_flag; });
         if (exit_flag && buffer.empty()) break;
         if (!buffer.empty()) {
             std::string data = buffer.front();
@@ -72,6 +74,8 @@ void sender() {
 }
 
 int main() {
+    std::locale::global(std::locale(""));
+
     std::thread t1(receiver);
     std::thread t2(sender);
 
