@@ -7,18 +7,20 @@
 #include <algorithm>
 #include <locale>
 #include <clocale>
+#include <cstring>
 
 #include "./../lib/library.h"
+
+extern "C" {
+    void function1(char* str);
+    int function2(const char* str);
+    bool function3(const char* str);
+}
 
 std::mutex m;
 std::condition_variable cv;
 std::queue<std::string> buffer;
 bool exit_flag = false;
-
-extern "C" {
-    void function1(char* str) { return;  };
-    int function2(const char* str) { return 0; };
-}
 
 void receiver() {
     while (!exit_flag) {
@@ -44,8 +46,8 @@ void receiver() {
             continue;
         }
         // Give input to function 1 of library
-        char* cstr = new char[input.size() + 1];
-        strcpy_s(cstr, input.size()+1, input.c_str());
+        char* cstr = new char[int(input.size()*1.5) + 2];
+        strncpy(cstr, input.c_str(), input.size()+1);
         function1(cstr);
         std::string processed_input(cstr);
         delete[] cstr;
@@ -76,7 +78,7 @@ void sender() {
 }
 
 int main() {
-    std::locale::global(std::locale(""));
+    std::locale::global(std::locale("C"));
 
     std::thread t1(receiver);
     std::thread t2(sender);

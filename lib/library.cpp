@@ -6,19 +6,19 @@
 void function1(char* str) {
     std::string s(str);
     std::sort(s.rbegin(), s.rend());
-    for (int i=0; i<s.size(); i += 2) {
-        if (i<s.size()) {
-            s.replace(i, i, "KB");
+    for (int i=1; i<s.size(); i += 2) {
+        if (i<s.size()) { 
+            s.replace(i++, 1, "KB");
         }
     }
-    strcpy_s(str, s.size()+1, s.c_str());
+    strncpy(str, s.c_str(), s.size() + 1);
 }
 
 int function2(const char* str) {
     int sum = 0;
     for (; *str; *str++) {
         if (isdigit(*str)) {
-            sum += *str - '0';
+            sum += (*str - '0');
         }
     }
     return sum;
