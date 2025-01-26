@@ -14,7 +14,6 @@
 extern "C" {
     void function1(char* str);
     int function2(const char* str);
-    bool function3(const char* str);
 }
 
 std::mutex m;
@@ -25,7 +24,10 @@ bool exit_flag = false;
 void receiver() {
     while (!exit_flag) {
         std::string input;
-        std::getline(std::cin, input);
+        if (!std::getline(std::cin, input)) {
+            exit_flag = true;
+            break;
+        }
 
         if (input == "Q") {
             exit_flag = true;
