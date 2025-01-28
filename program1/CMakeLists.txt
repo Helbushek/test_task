@@ -7,4 +7,5 @@ if (WIN32)
         $<TARGET_FILE:libcustom>
         $<TARGET_FILE_DIR:program1>
     )
+    target_link_libraries(program1 ws2_32)
 endif()

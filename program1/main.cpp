@@ -8,6 +8,17 @@
 #include <locale>
 #include <clocale>
 #include <cstring>
+#include <atomic>
+
+#ifdef _WIN32
+    #include <winsock2.h>
+    #pragma comment(lib, "ws2_32.lib")
+#else
+    #include <sys/socket.h>
+    #include <netinet/in.h>
+    #include <arpa/inet.h>
+    #include <unistd.h>
+#endif
 
 #include "./../lib/library.h"
 
@@ -20,6 +31,34 @@ std::mutex m;
 std::condition_variable cv;
 std::queue<std::string> buffer;
 bool exit_flag = false;
+SOCKET sock;
+sockaddr_in in_addr{};
+
+bool reconnect() {
+    #ifdef _WIN32
+        closesocket(sock);
+    #else
+        close(sock);
+    #endif
+
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock == -1) {
+        return false;
+    }
+    
+    in_addr.sin_family = AF_INET;
+    in_addr.sin_port = htons(8080);
+    in_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+    while (!exit_flag) {
+        if (connect(sock, (sockaddr*)&in_addr, sizeof(in_addr)) != -1) {
+            std::cout << "Connected to server" << std::endl;
+            return true;
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+    return false;
+}
 
 void receiver() {
     while (!exit_flag) {
@@ -29,31 +68,29 @@ void receiver() {
             break;
         }
 
-        if (input == "Q") {
-            exit_flag = true;
-            cv.notify_one();
-            break;
-        }
+        // If exit flag is needed, there is option to quit program on writing "Q", but server part would still be runnign and accepting new connections 
+        // if (input == "Q") {
+        //     exit_flag = true;
+        //     send(sock, input.c_str(), sizeof(input), 0);
+        //     cv.notify_one();
+        //     break;
+        // }
 
-        // check for length constraint 
         if (input.length() > 64) {
             std::cerr << "Error: Max length is 64 symbols\n";
             continue;
         }
-        //check for only numbers constraint
         bool valid = std::all_of(input.begin(), input.end(), [](char c) { return std::isdigit(c); });
 
         if (!valid) {
             std::cerr << "Error: Only digits allowed\n";
             continue;
         }
-        // Give input to function 1 of library
         char* cstr = new char[int(input.size()*1.5) + 2];
         strncpy(cstr, input.c_str(), input.size()+1);
         function1(cstr);
         std::string processed_input(cstr);
         delete[] cstr;
-        // push data to buffer
         {
             std::lock_guard<std::mutex> lock(m);
             buffer.push(processed_input);
@@ -63,18 +100,31 @@ void receiver() {
 }
 
 void sender() {
-    while (true) {
+    while (!exit_flag) {
         std::unique_lock<std::mutex> lock(m);
         cv.wait(lock, [] { return !buffer.empty() || exit_flag; });
         if (exit_flag && buffer.empty()) break;
         if (!buffer.empty()) {
             std::string data = buffer.front();
             buffer.pop();
-            std::cout << data;
-            // pass data to function 2 of library
+            lock.unlock();
+
             int sum = function2(data.c_str());
-            // pass result to program 2
-            std::cout << "Data: " << data << " | sum = " << sum << std::endl;
+            std::string s = std::to_string(sum);
+
+            bool sent = false;
+            while(!sent && !exit_flag) {
+                int res = send(sock, s.c_str(), s.size(), 0);
+
+                if (res == -1) {
+                    if (!reconnect()) {
+                        std::this_thread::sleep_for(std::chrono::seconds(1));
+                    }
+                }
+                else {
+                    sent = true;
+                }
+            }   
         }
     }
 }
@@ -82,11 +132,31 @@ void sender() {
 int main() {
     std::locale::global(std::locale("C"));
 
+    #ifdef _WIN32
+        WSADATA wsaData;
+        WSAStartup(MAKEWORD(2, 2), &wsaData);
+    #endif
+
+    while(!reconnect()) {
+        std::cerr << "Failed to connect or lost connection to server, retrying...";
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+
     std::thread t1(receiver);
     std::thread t2(sender);
 
     t1.join();
     t2.join();
+
+    #ifdef _WIN32
+        closesocket(sock);
+    #else
+        close(sock);
+    #endif
+
+    #ifdef _WIN32
+        WSAStartup(MAKEWORD(2, 2), &wsaData);
+    #endif
 
     return 0;
 }
