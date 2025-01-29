@@ -9,6 +9,7 @@
 #include <clocale>
 #include <cstring>
 #include <atomic>
+#include <vector>
 
 #ifdef _WIN32
     #include <winsock2.h>
@@ -68,7 +69,7 @@ void receiver() {
             break;
         }
 
-        // If exit flag is needed, there is option to quit program on writing "Q", but server part would still be runnign and accepting new connections 
+        // If exit flag is needed, there is option to quit program on input "Q", but server part would still be runnign and accepting new connections 
         // if (input == "Q") {
         //     exit_flag = true;
         //     send(sock, input.c_str(), sizeof(input), 0);
@@ -86,11 +87,11 @@ void receiver() {
             std::cerr << "Error: Only digits allowed\n";
             continue;
         }
+        std::vector<char> cstr(input.size()+1);
         char* cstr = new char[int(input.size()*1.5) + 2];
-        strncpy(cstr, input.c_str(), input.size()+1);
-        function1(cstr);
-        std::string processed_input(cstr);
-        delete[] cstr;
+        strncpy(cstr.data(), input.c_str(), input.size()+1);
+        function1(cstr.data());
+        std::string processed_input(cstr.data());
         {
             std::lock_guard<std::mutex> lock(m);
             buffer.push(processed_input);

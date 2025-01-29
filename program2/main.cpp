@@ -22,7 +22,6 @@ extern "C" {
 
 bool exit_flag = false;
 SOCKET sock;
-int client_socket;
 
 void process_data(const std::string& s) {
     if (function3(s.c_str())) {
@@ -33,7 +32,7 @@ void process_data(const std::string& s) {
     }
 }
 
-void server() {
+void server(SOCKET client_socket) {
     while(!exit_flag) {
         char buffer[1024];
         int bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
@@ -62,6 +61,8 @@ int main() {
     in_addr.sin_family = AF_INET;
     in_addr.sin_port = htons(8080);
     in_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    int reuse = 1;
+    setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char*)&reuse, sizeof(reuse));
     if (in_addr.sin_addr.s_addr == INADDR_NONE) {
         std::cerr << "Invalid IP address" << std::endl;
         return 1;
@@ -81,12 +82,12 @@ int main() {
     sockaddr_in client_addr{};
     int client_addr_len = sizeof(client_addr);
     while (true) {
-        client_socket = accept(sock, (sockaddr*)&in_addr, &client_addr_len);
+        SOCKET client_socket = accept(sock, (sockaddr*)&in_addr, &client_addr_len);
         if(client_socket == -1) {
             continue;
         }
 
-        std::thread (server).detach();
+        std::thread (server, client_socket).detach();
     }
 
     #ifdef _WIN32
