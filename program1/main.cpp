@@ -44,6 +44,7 @@ bool reconnect() {
 
     sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock == -1) {
+        std::cerr << "Error: Can`t establish socket connection. Retrying..." << std::endl;
         return false;
     }
     
@@ -56,6 +57,7 @@ bool reconnect() {
             std::cout << "Connected to server" << std::endl;
             return true;
         }
+        std::cerr << "Error: Connection to the server is lost, please wait. Reconnecting..." << std::endl;
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
     return false;
@@ -69,14 +71,6 @@ void receiver() {
             break;
         }
 
-        // If exit flag is needed, there is option to quit program on input "Q", but server part would still be runnign and accepting new connections 
-        // if (input == "Q") {
-        //     exit_flag = true;
-        //     send(sock, input.c_str(), sizeof(input), 0);
-        //     cv.notify_one();
-        //     break;
-        // }
-
         if (input.length() > 64) {
             std::cerr << "Error: Max length is 64 symbols\n";
             continue;
@@ -88,7 +82,6 @@ void receiver() {
             continue;
         }
         std::vector<char> cstr(input.size()+1);
-        char* cstr = new char[int(input.size()*1.5) + 2];
         strncpy(cstr.data(), input.c_str(), input.size()+1);
         function1(cstr.data());
         std::string processed_input(cstr.data());
@@ -113,8 +106,9 @@ void sender() {
             int sum = function2(data.c_str());
             std::string s = std::to_string(sum);
 
-            bool sent = false;
+            bool sent;
             while(!sent && !exit_flag) {
+                sent = false;
                 int res = send(sock, s.c_str(), s.size(), 0);
 
                 if (res == -1) {

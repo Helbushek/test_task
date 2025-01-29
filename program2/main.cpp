@@ -3,6 +3,8 @@
 #include <thread>
 #include <queue>
 #include <string>
+#include <atomic>
+#include <clocale>
 
 #ifdef _WIN32
     #include <winsock2.h>
@@ -20,8 +22,9 @@ extern "C" {
     bool function3(const char* str);
 }
 
-bool exit_flag = false;
+std::atomic<bool> exit_flag(false);
 SOCKET sock;
+SOCKET client_socket;
 
 void process_data(const std::string& s) {
     if (function3(s.c_str())) {
@@ -32,20 +35,22 @@ void process_data(const std::string& s) {
     }
 }
 
-void server(SOCKET client_socket) {
+void server() {
     while(!exit_flag) {
         char buffer[1024];
         int bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
         if (bytes_received <= 0) {
             continue;
         }
-        std::string s(buffer);
+        std::string s(buffer, bytes_received);
         process_data(s);
-    }
+    }   
     closesocket(client_socket);
 }
 
 int main() {
+    std::locale::global(std::locale("C"));
+
     #ifdef _WIN32
         WSADATA wsaData;
         WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -61,8 +66,7 @@ int main() {
     in_addr.sin_family = AF_INET;
     in_addr.sin_port = htons(8080);
     in_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    int reuse = 1;
-    setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char*)&reuse, sizeof(reuse));
+
     if (in_addr.sin_addr.s_addr == INADDR_NONE) {
         std::cerr << "Invalid IP address" << std::endl;
         return 1;
@@ -81,13 +85,13 @@ int main() {
 
     sockaddr_in client_addr{};
     int client_addr_len = sizeof(client_addr);
-    while (true) {
-        SOCKET client_socket = accept(sock, (sockaddr*)&in_addr, &client_addr_len);
+    while (!exit_flag) {
+        client_socket = accept(sock, (sockaddr*)&in_addr, &client_addr_len);
         if(client_socket == -1) {
             continue;
         }
 
-        std::thread (server, client_socket).detach();
+        std::thread (server).detach();
     }
 
     #ifdef _WIN32
